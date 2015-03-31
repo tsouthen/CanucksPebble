@@ -1,0 +1,26 @@
+{
+    "appKeys": {},
+    "capabilities": [
+        ""
+    ],
+    "companyName": "tsouthen@gmail.com",
+    "longName": "Canucks",
+    "projectType": "native",
+    "resources": {
+        "media": [
+            {
+                "file": "images/Vancouver_Canucks_144.png",
+                "name": "LOGO",
+                "type": "png-trans"
+            }
+        ]
+    },
+    "sdkVersion": "2",
+    "shortName": "Canucks",
+    "uuid": "7a1b378f-1d06-45fb-9346-864aa6a54098",
+    "versionCode": 1,
+    "versionLabel": "1.0",
+    "watchapp": {
+        "watchface": true
+    }
+}
