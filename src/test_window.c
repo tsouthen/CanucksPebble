@@ -54,10 +54,10 @@ static void initialise_ui(void) {
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_date);
   
   // s_textlayer_next
-  s_textlayer_next = text_layer_create(GRect(0, 107, 144, 29));
+  s_textlayer_next = text_layer_create(GRect(1, 108, 143, 27));
   text_layer_set_background_color(s_textlayer_next, GColorBlack);
   text_layer_set_text_color(s_textlayer_next, GColorWhite);
-  text_layer_set_text(s_textlayer_next, "Thu 5:30 @ CHI");
+  text_layer_set_text(s_textlayer_next, "...loading...");
   text_layer_set_text_alignment(s_textlayer_next, GTextAlignmentCenter);
   text_layer_set_font(s_textlayer_next, s_res_roboto_condensed_21);
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_next);
@@ -73,18 +73,6 @@ static void destroy_ui(void) {
   gbitmap_destroy(s_res_logo_white);
 }
 // END AUTO-GENERATED UI CODE
-
-const char WEEKDAY_NAMES[6][7][5] = { // 3 chars, 1 for utf-8, 1 for terminating 0
-  {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"},
-  {"So",  "Mo",  "Di",  "Mi",  "Do",  "Fr",  "Sa" },
-  {"Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"},
-  {"Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"},
-  {"Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"},
-  {"Sön", "Mån", "Tis", "Ons", "Tor", "Fre", "Lör"},
-};
-
-#define DATE_BUFFER_BYTES 32
-static char date_buffer[DATE_BUFFER_BYTES];
 
 static void handle_window_unload(Window* window) {
   destroy_ui();
@@ -102,53 +90,15 @@ void hide_test_window(void) {
   window_stack_remove(s_window, true);
 }
 
-void update_time(struct tm *tick_time) {
-  // Get a tm structure
-  if (tick_time == NULL) {
-    time_t temp = time(NULL); 
-    tick_time = localtime(&temp);      
-  }
-  
-  // Create a long-lived buffer
-  static char buffer[] = "00:00";
-  char* formattedTime = &buffer[0];
-
-  // Write the current hours and minutes into the buffer
-  if (clock_is_24h_style()) {
-    //Use 2h hour format
-    strftime(buffer, sizeof(buffer), "%H:%M", tick_time);
-  } else {
-    //Use 12 hour format
-    strftime(buffer, sizeof(buffer), "%I:%M", tick_time);
-    if (buffer[0] == '0')
-      formattedTime = &buffer[1];
-  }
-
-  // Display this time on the TextLayer
-  text_layer_set_text(s_time_layer, formattedTime);
+TextLayer* get_time_layer() {
+  return s_time_layer;
 }
-
-void update_date(struct tm *tick_time) {
-  if (tick_time == NULL) {
-    time_t temp = time(NULL); 
-    tick_time = localtime(&temp);      
-  }
-  text_layer_set_text(s_textlayer_day, WEEKDAY_NAMES[0][tick_time->tm_wday]);
-  strftime(date_buffer, DATE_BUFFER_BYTES, "%e", tick_time);  
-  text_layer_set_text(s_textlayer_date, date_buffer);
+TextLayer* get_textlayer_day() {
+  return s_textlayer_day;
 }
-
-void hide_next_game() {
-  layer_set_hidden(text_layer_get_layer(s_textlayer_next), true);
+TextLayer* get_textlayer_date() {
+  return s_textlayer_date;
 }
-
-void show_next_game() {
-  layer_set_hidden(text_layer_get_layer(s_textlayer_next), false);
-}
-
-void toggle_next_game() {
-  if (layer_get_hidden(text_layer_get_layer(s_textlayer_next)))
-    show_next_game();
-  else
-    hide_next_game();
+TextLayer* get_textlayer_next() {
+  return s_textlayer_next;
 }
