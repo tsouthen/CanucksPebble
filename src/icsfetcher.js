@@ -1,3 +1,20 @@
+Pebble.addEventListener('ready', function(e) {
+  console.log('PebbleKit JS Ready!');
+
+  // Construct a dictionary
+  var dict = { '1': 1 };
+
+  // Send a string to Pebble
+  Pebble.sendAppMessage(dict,
+    function(e) {
+      console.log('Send successful.');
+    },
+    function(e) {
+      console.log('Send failed!');
+    }
+  );
+});
+
 Pebble.addEventListener('appmessage',
   function(e) {
     console.log('Received message: ' + JSON.stringify(e.payload));

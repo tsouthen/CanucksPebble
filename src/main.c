@@ -18,7 +18,16 @@ static void tap_handler(AccelAxisType axis, int32_t direction) {
   toggle_next_game();
 }
 
+static void send_int(int key, int value) {
+  DictionaryIterator *iter;
+  app_message_outbox_begin(&iter);
+  dict_write_int(iter, key, &value, sizeof(int), true);
+  app_message_outbox_send();
+  set_next_game_text("sending...");
+}
+
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  set_next_game_text("msg recd");
   // Get the first pair
   Tuple *t = dict_read_first(iterator);
 
@@ -30,10 +39,15 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     // Process this pair's key
     switch (t->key) {
       case 0:
-      //case KEY_DATA:
+        APP_LOG(APP_LOG_LEVEL_ERROR, "Msg 0 received");
         // Copy value and display
         snprintf(s_buffer, sizeof(s_buffer), "%s", t->value->cstring);
         set_next_game_text(s_buffer);
+        break;
+      
+      case 1:
+        APP_LOG(APP_LOG_LEVEL_ERROR, "Msg 1 received");
+        send_int(0, 0);
         break;
     }
 
@@ -44,21 +58,19 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+  set_next_game_text("msg dropped");
 }
 
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
-  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+  static char s_errMsg[64];
+  snprintf(s_errMsg, sizeof(s_errMsg), "Outbox send failed! reason: %d", reason);
+  APP_LOG(APP_LOG_LEVEL_ERROR, s_errMsg);
+  set_next_game_text("send failed");
 }
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
-}
-
-static void send_int(int key, int value) {
-  DictionaryIterator *iter;
-  app_message_outbox_begin(&iter);
-  dict_write_int(iter, key, &value, sizeof(int), true);
-  app_message_outbox_send();
+  set_next_game_text("send success");
 }
 
 int main(void) {
@@ -75,7 +87,6 @@ int main(void) {
 
   //hide_next_game();
   //request updated next game
-  send_int(0, 0);
   
   update_time(NULL);
   update_date(NULL);

@@ -54,7 +54,7 @@ static void initialise_ui(void) {
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_date);
   
   // s_textlayer_next
-  s_textlayer_next = text_layer_create(GRect(1, 108, 143, 27));
+  s_textlayer_next = text_layer_create(GRect(1, 110, 143, 27));
   text_layer_set_background_color(s_textlayer_next, GColorBlack);
   text_layer_set_text_color(s_textlayer_next, GColorWhite);
   text_layer_set_text(s_textlayer_next, "...loading...");
