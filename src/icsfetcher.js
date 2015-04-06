@@ -1,11 +1,8 @@
 Pebble.addEventListener('ready', function(e) {
   console.log('PebbleKit JS Ready!');
 
-  // Construct a dictionary
-  var dict = { '1': 1 };
-
   // Send a string to Pebble
-  Pebble.sendAppMessage(dict,
+  Pebble.sendAppMessage({ '0': 1 },
     function(e) {
       console.log('Send successful.');
     },
@@ -24,11 +21,19 @@ Pebble.addEventListener('appmessage',
 function icsCallback(icalData) {
 	var events = parseIcs(icalData);
 	var i;
+  var msg = { "7" : 1};
 	for (i=0; i < events.length; i++) {
-		log("Event " + i + ":");
-		logObject(events[i]);
+    var currEvent = events[i];
+    if (currEvent !== null) {
+      log("Event " + i + ":");
+      logObject(currEvent);
+      var idx = i * 3;
+      msg[idx+1] = getSummary(currEvent, "Vancouver");
+      msg[idx+2] = Math.round(currEvent.DTSTART / 1000);
+      msg[idx+3] = Math.round(currEvent.DTEND / 1000);
+    }     
 	}
-  Pebble.sendAppMessage({"0" : getSummary(events[events.length-1], "Vancouver")});
+  Pebble.sendAppMessage(msg);
 }
 
 var abbreviations = {
@@ -91,7 +96,7 @@ function getSummary(event, homeTeam) {
 		} else {
 			newSummary = "" + (startDate.getMonth() + 1).toString() + "/" + pad(startDate.getDate(), 2);
 		}
-		newSummary += " " + startDate.getHours() + ":" + pad(startDate.getMinutes(), 2);
+		newSummary += " " + (startDate.getHours() % 12) + ":" + pad(startDate.getMinutes(), 2);
 	}
 	var teams = summary.split(" at ");
 	if (teams.length == 2) {
@@ -216,6 +221,9 @@ function parseIcs(ics) {
 			}
 		}
 	}
+  if (lastStart !== 0) {
+    return [getFields({ "lines": lines, "linesLength": linesLength, "currLine": lastStart }), null];
+  }
 	return null;
 }
 
