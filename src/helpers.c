@@ -66,5 +66,9 @@ void toggle_next_game() {
 }
 
 void set_next_game_text(char* text) {
-  text_layer_set_text(get_textlayer_next(), text);
+  TextLayer* textLayer = get_textlayer_next();
+  if (textLayer)
+    text_layer_set_text(textLayer, text);
+  else
+    APP_LOG(APP_LOG_LEVEL_ERROR, "Text layer is null");
 }

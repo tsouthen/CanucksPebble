@@ -12,16 +12,17 @@ Pebble.addEventListener('ready', function(e) {
   );
 });
 
-Pebble.addEventListener('appmessage',
-  function(e) {
-    console.log('Received message: ' + JSON.stringify(e.payload));
-    getIcs('van', icsCallback);
-  } );
+Pebble.addEventListener('appmessage', function(e) {
+  console.log('Received message: ' + JSON.stringify(e.payload));
+  getIcs('van', icsCallback);
+});
 
 function icsCallback(icalData) {
+  log("icsCallback start");
 	var events = parseIcs(icalData);
+  log("events returned");
 	var i;
-  var msg = { "7" : 1};
+  var msg = {};
 	for (i=0; i < events.length; i++) {
     var currEvent = events[i];
     if (currEvent !== null) {
@@ -33,7 +34,9 @@ function icsCallback(icalData) {
       msg[idx+3] = Math.round(currEvent.DTEND / 1000);
     }     
 	}
+  log("icsCallback sending app msg: " + msg);
   Pebble.sendAppMessage(msg);
+  log("icsCallback end");
 }
 
 var abbreviations = {
@@ -183,10 +186,10 @@ function getFields(linesObj) {
 }
 
 function parseIcs(ics) {
-	//log("Parsing ical data");
+	log("Parsing ical data");
 	var now = new Date();
 	var lines = ics.split(/\r\n|\n|\r/);
-	//log("Parsing " + lines.length + " lines");
+	log("Parsing " + lines.length + " lines");
 
 	var found = false;
 	var i, linesLength, lastStart;
@@ -210,11 +213,12 @@ function parseIcs(ics) {
 				var lastEvent = {};
 				if (lastStart !== 0) {
 					lastEvent = getFields(linesObj);
-				}
+				} else {
+          lastEvent = {"SUMMARY" : "no previous game"};
+        }
 				//get next event
 				linesObj.currLine = i;
-				var nextEvent = getFields(linesObj, currDate);
-				
+				var nextEvent = getFields(linesObj, currDate);				
 				return [lastEvent, nextEvent];
 			} else {
 				lastStart = i;
@@ -222,9 +226,9 @@ function parseIcs(ics) {
 		}
 	}
   if (lastStart !== 0) {
-    return [getFields({ "lines": lines, "linesLength": linesLength, "currLine": lastStart }), null];
+    return [getFields({ "lines": lines, "linesLength": linesLength, "currLine": lastStart }), {"SUMMARY" : "no next game"}];
   }
-	return null;
+	return [{"SUMMARY" : "no previous game"}, {"SUMMARY" : "no next game"}];
 }
 
 function logObject(objToLog) {

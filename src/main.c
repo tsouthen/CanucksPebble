@@ -1,7 +1,8 @@
 #include <pebble.h>
 #include "test_window.h"
 #include "helpers.h"  
-
+#include "PDUtils.h"
+  
 #define KEY_JS_READY   0
 #define KEY_LAST_TEXT  1
 #define KEY_LAST_START 2
@@ -9,7 +10,6 @@
 #define KEY_NEXT_TEXT  4
 #define KEY_NEXT_START 5
 #define KEY_NEXT_END   6
-#define KEY_NEXT_LAST  7
   
 enum NextLastState {
   NEXT_LAST_NotShown = 0,
@@ -32,84 +32,92 @@ static void send_int(int key, int value) {
   app_message_outbox_send();
   APP_LOG(APP_LOG_LEVEL_INFO, "Sending int message...");
   set_next_game_text("sending...");
+  APP_LOG(APP_LOG_LEVEL_INFO, "Exiting send_int");
+}
+
+static void sendRequestIfNecessary(time_t now) {
+  if (s_nextStart < now) {
+    APP_LOG(APP_LOG_LEVEL_INFO, "sending request from sendRequestIfNecessary");
+    send_int(0, 0);          
+    APP_LOG(APP_LOG_LEVEL_INFO, "sent request from sendRequestIfNecessary");
+  }
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
+  time_t now = p_mktime(tick_time);
   update_time(tick_time);
   if (s_wday != tick_time->tm_wday || s_mday != tick_time->tm_mday) {
     s_wday = tick_time->tm_wday;
     s_mday = tick_time->tm_mday;
     update_date(tick_time);
-    
-    //get updated next/last game info
-    send_int(KEY_NEXT_LAST, 0);
+    sendRequestIfNecessary(now);
   }
   
   //vibrate if next game is starting
-  if (s_nextStart != 0 && s_nextStart == mktime(tick_time)) {
+  if (s_nextStart != 0 && s_nextStart == now) {
     vibes_double_pulse();
   }
 }
 
 static void tap_handler(AccelAxisType axis, int32_t direction) {
-  toggle_next_game();
+  s_state = (s_state + 1) % 3;
+  
+  if (s_state == NEXT_LAST_NotShown) {
+    hide_next_game();
+  } else {
+    set_next_game_text(s_state == NEXT_LAST_NextShown ? s_nextText : s_lastText);
+    show_next_game();
+  }
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
-  set_next_game_text("msg recd");
   // Get the first pair
   Tuple *t = dict_read_first(iterator);
 
   // Process all pairs present
   while (t != NULL) {
-    // Long lived buffer
-    static char s_buffer[64];
-    snprintf(s_buffer, sizeof(s_buffer), "Msg %lu received", t->key);
-    APP_LOG(APP_LOG_LEVEL_INFO, s_buffer);
+    APP_LOG(APP_LOG_LEVEL_INFO, "Msg %d received", (int) t->key);
 
     // Process this pair's key
     switch (t->key) {
-      case KEY_JS_READY: {
-        //if s_nextStart is out of date, request new data
-        if (s_state != NEXT_LAST_NotShown) {
-          time_t now = time(NULL);
-          if (s_nextStart < now)
-            send_int(KEY_NEXT_LAST, 0);          
-        }
+      case KEY_JS_READY:
+        sendRequestIfNecessary(time(NULL));
         break;
-      }
       
-      case KEY_NEXT_LAST:
+      case KEY_LAST_TEXT:
         //clear out vars and persisted data
         s_nextText[0] = 0;
         s_lastText[0] = 0;
         s_nextStart = 0;
         s_nextEnd = 0;
-        persist_delete(KEY_LAST_TEXT);
-        persist_delete(KEY_NEXT_TEXT);
-        persist_delete(KEY_NEXT_START);
-        persist_delete(KEY_NEXT_END);
-        break;
-      
-      case KEY_LAST_TEXT:
-        snprintf(s_lastText, sizeof(s_lastText), "%s", t->value->cstring);
-        persist_write_string(KEY_LAST_TEXT, s_lastText);
+        //persist_delete(KEY_LAST_TEXT);
+        //persist_delete(KEY_NEXT_TEXT);
+        //persist_delete(KEY_NEXT_START);
+        //persist_delete(KEY_NEXT_END);
+
+        strncpy(s_lastText, t->value->cstring, sizeof(s_lastText));
+        //persist_write_string(KEY_LAST_TEXT, s_lastText);
+        if (s_state == NEXT_LAST_LastShown) {
+          set_next_game_text(s_lastText);
+        }
         break;
       
       case KEY_NEXT_TEXT:
-        snprintf(s_nextText, sizeof(s_nextText), "%s", t->value->cstring);
-        set_next_game_text(s_nextText);
-        persist_write_string(KEY_NEXT_TEXT, s_nextText);
+        strncpy(s_nextText, t->value->cstring, sizeof(s_nextText));
+        //persist_write_string(KEY_NEXT_TEXT, s_nextText);
+        if (s_state == NEXT_LAST_NextShown) {
+          set_next_game_text(s_nextText);
+        }
         break;
       
       case KEY_NEXT_START:
         s_nextStart = t->value->uint32;
-        persist_write_int(KEY_NEXT_START, s_nextStart);
+        //persist_write_int(KEY_NEXT_START, s_nextStart);
         break;
 
       case KEY_NEXT_END:
         s_nextEnd = t->value->uint32;
-        persist_write_int(KEY_NEXT_END, s_nextEnd);
+        //persist_write_int(KEY_NEXT_END, s_nextEnd);
         break;
     }
 
@@ -124,9 +132,7 @@ static void inbox_dropped_callback(AppMessageResult reason, void *context) {
 }
 
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
-  static char s_errMsg[64];
-  snprintf(s_errMsg, sizeof(s_errMsg), "Outbox send failed! reason: %d", reason);
-  APP_LOG(APP_LOG_LEVEL_ERROR, s_errMsg);
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed! reason: %d", reason);
   set_next_game_text("send failed");
 }
 
@@ -136,15 +142,9 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
 }
 
 int main(void) {
-  //register callbacks
-  app_message_register_inbox_received(inbox_received_callback);
-  app_message_register_inbox_dropped(inbox_dropped_callback);
-  app_message_register_outbox_failed(outbox_failed_callback);
-  app_message_register_outbox_sent(outbox_sent_callback);
+  show_test_window();
 
-  //open app message
-  app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
-
+  /*
   //get persisted data
   if (persist_read_string(KEY_NEXT_TEXT, s_nextText, sizeof(s_nextText)) > 0) {
     APP_LOG(APP_LOG_LEVEL_INFO, "Read persisted next text");
@@ -160,18 +160,25 @@ int main(void) {
   if (persist_read_string(KEY_LAST_TEXT, s_lastText, sizeof(s_lastText)) > 0) {
     APP_LOG(APP_LOG_LEVEL_INFO, "Read persisted last text");
   }
+  */
+
+  /*
   if (s_nextText[0])
     set_next_game_text(s_nextText);
   else if (s_lastText[0])
     set_next_game_text(s_lastText);
-
-  show_test_window();
-
+  */
   update_time(NULL);
   update_date(NULL);
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   accel_tap_service_subscribe(tap_handler);
-  
+
+  app_message_register_inbox_received(inbox_received_callback);
+  app_message_register_inbox_dropped(inbox_dropped_callback);
+  app_message_register_outbox_failed(outbox_failed_callback);
+  app_message_register_outbox_sent(outbox_sent_callback);
+  app_message_open(app_message_inbox_size_maximum(), app_message_outbox_size_maximum());
+
   app_event_loop();
   hide_test_window();
 }
