@@ -29,17 +29,14 @@ static void send_int(int key, int value) {
   DictionaryIterator *iter;
   app_message_outbox_begin(&iter);
   dict_write_int(iter, key, &value, sizeof(int), true);
-  app_message_outbox_send();
   APP_LOG(APP_LOG_LEVEL_INFO, "Sending int message...");
-  set_next_game_text("sending...");
-  APP_LOG(APP_LOG_LEVEL_INFO, "Exiting send_int");
+  app_message_outbox_send();
+  //set_next_game_text("sending");
 }
 
 static void sendRequestIfNecessary(time_t now) {
   if (s_nextStart < now) {
-    APP_LOG(APP_LOG_LEVEL_INFO, "sending request from sendRequestIfNecessary");
     send_int(0, 0);          
-    APP_LOG(APP_LOG_LEVEL_INFO, "sent request from sendRequestIfNecessary");
   }
 }
 
@@ -59,13 +56,17 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   }
 }
 
+static void setNextGameTextFromState() {
+  set_next_game_text(s_state == NEXT_LAST_NextShown ? s_nextText : s_lastText);  
+}
+
 static void tap_handler(AccelAxisType axis, int32_t direction) {
   s_state = (s_state + 1) % 3;
   
   if (s_state == NEXT_LAST_NotShown) {
     hide_next_game();
   } else {
-    set_next_game_text(s_state == NEXT_LAST_NextShown ? s_nextText : s_lastText);
+    setNextGameTextFromState();
     show_next_game();
   }
 }
@@ -90,13 +91,13 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         s_lastText[0] = 0;
         s_nextStart = 0;
         s_nextEnd = 0;
-        //persist_delete(KEY_LAST_TEXT);
-        //persist_delete(KEY_NEXT_TEXT);
-        //persist_delete(KEY_NEXT_START);
-        //persist_delete(KEY_NEXT_END);
+        persist_delete(KEY_LAST_TEXT);
+        persist_delete(KEY_NEXT_TEXT);
+        persist_delete(KEY_NEXT_START);
+        persist_delete(KEY_NEXT_END);
 
         strncpy(s_lastText, t->value->cstring, sizeof(s_lastText));
-        //persist_write_string(KEY_LAST_TEXT, s_lastText);
+        persist_write_string(KEY_LAST_TEXT, s_lastText);
         if (s_state == NEXT_LAST_LastShown) {
           set_next_game_text(s_lastText);
         }
@@ -104,7 +105,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
       
       case KEY_NEXT_TEXT:
         strncpy(s_nextText, t->value->cstring, sizeof(s_nextText));
-        //persist_write_string(KEY_NEXT_TEXT, s_nextText);
+        persist_write_string(KEY_NEXT_TEXT, s_nextText);
         if (s_state == NEXT_LAST_NextShown) {
           set_next_game_text(s_nextText);
         }
@@ -112,12 +113,12 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
       
       case KEY_NEXT_START:
         s_nextStart = t->value->uint32;
-        //persist_write_int(KEY_NEXT_START, s_nextStart);
+        persist_write_int(KEY_NEXT_START, s_nextStart);
         break;
 
       case KEY_NEXT_END:
         s_nextEnd = t->value->uint32;
-        //persist_write_int(KEY_NEXT_END, s_nextEnd);
+        persist_write_int(KEY_NEXT_END, s_nextEnd);
         break;
     }
 
@@ -128,23 +129,22 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 
 static void inbox_dropped_callback(AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
-  set_next_game_text("msg dropped");
+  //set_next_game_text("msg dropped");
 }
 
 static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
   APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed! reason: %d", reason);
-  set_next_game_text("send failed");
+  //set_next_game_text("send failed");
 }
 
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
-  set_next_game_text("send success");
+  //set_next_game_text("send success");
 }
 
 int main(void) {
   show_test_window();
 
-  /*
   //get persisted data
   if (persist_read_string(KEY_NEXT_TEXT, s_nextText, sizeof(s_nextText)) > 0) {
     APP_LOG(APP_LOG_LEVEL_INFO, "Read persisted next text");
@@ -160,14 +160,9 @@ int main(void) {
   if (persist_read_string(KEY_LAST_TEXT, s_lastText, sizeof(s_lastText)) > 0) {
     APP_LOG(APP_LOG_LEVEL_INFO, "Read persisted last text");
   }
-  */
 
-  /*
-  if (s_nextText[0])
-    set_next_game_text(s_nextText);
-  else if (s_lastText[0])
-    set_next_game_text(s_lastText);
-  */
+  setNextGameTextFromState();
+
   update_time(NULL);
   update_date(NULL);
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);

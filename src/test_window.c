@@ -57,7 +57,6 @@ static void initialise_ui(void) {
   s_textlayer_next = text_layer_create(GRect(1, 110, 143, 27));
   text_layer_set_background_color(s_textlayer_next, GColorBlack);
   text_layer_set_text_color(s_textlayer_next, GColorWhite);
-  text_layer_set_text(s_textlayer_next, "...loading...");
   text_layer_set_text_alignment(s_textlayer_next, GTextAlignmentCenter);
   text_layer_set_font(s_textlayer_next, s_res_roboto_condensed_21);
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_textlayer_next);
