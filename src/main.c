@@ -10,6 +10,7 @@
 #define KEY_NEXT_TEXT  4
 #define KEY_NEXT_START 5
 #define KEY_NEXT_END   6
+#define KEY_ERROR      99
   
 enum NextLastState {
   NEXT_LAST_NotShown = 0,
@@ -62,13 +63,35 @@ static void setNextGameTextFromState() {
 
 static void tap_handler(AccelAxisType axis, int32_t direction) {
   s_state = (s_state + 1) % 3;
-  
-  if (s_state == NEXT_LAST_NotShown) {
-    hide_next_game();
-  } else {
-    setNextGameTextFromState();
-    show_next_game();
+
+  switch (s_state) {
+    case NEXT_LAST_NotShown:
+      hide_next_game();
+      break;
+    
+    case NEXT_LAST_NextShown:
+      if (s_nextEnd == -1) {
+        sendRequestIfNecessary(time(NULL));
+        strcpy(s_nextText, "loading...");
+        strcpy(s_lastText, s_nextText);
+      }
+    case NEXT_LAST_LastShown:
+      setNextGameTextFromState();
+      show_next_game();
+      break;
   }
+}
+
+static void clearVarsAndPersistedData() {
+  //clear out vars and persisted data
+  s_nextText[0] = 0;
+  s_lastText[0] = 0;
+  s_nextStart = 0;
+  s_nextEnd = 0;
+  persist_delete(KEY_LAST_TEXT);
+  persist_delete(KEY_NEXT_TEXT);
+  persist_delete(KEY_NEXT_START);
+  persist_delete(KEY_NEXT_END);
 }
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
@@ -86,16 +109,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         break;
       
       case KEY_LAST_TEXT:
-        //clear out vars and persisted data
-        s_nextText[0] = 0;
-        s_lastText[0] = 0;
-        s_nextStart = 0;
-        s_nextEnd = 0;
-        persist_delete(KEY_LAST_TEXT);
-        persist_delete(KEY_NEXT_TEXT);
-        persist_delete(KEY_NEXT_START);
-        persist_delete(KEY_NEXT_END);
-
+        clearVarsAndPersistedData();
         strncpy(s_lastText, t->value->cstring, sizeof(s_lastText));
         persist_write_string(KEY_LAST_TEXT, s_lastText);
         if (s_state == NEXT_LAST_LastShown) {
@@ -119,6 +133,14 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
       case KEY_NEXT_END:
         s_nextEnd = t->value->uint32;
         persist_write_int(KEY_NEXT_END, s_nextEnd);
+        break;
+      
+      case KEY_ERROR:
+        clearVarsAndPersistedData();
+        s_nextEnd = -1; //signifies we have an error condition, so refresh when we can
+        snprintf(s_nextText, sizeof(s_nextText), "Error: %d", t->value->int16);
+        strcpy(s_lastText, s_nextText);
+        set_next_game_text(s_nextText);
         break;
     }
 

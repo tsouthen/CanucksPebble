@@ -136,12 +136,10 @@ function getIcs(team, callback) {
     req.open('GET', 'http://sports.yahoo.com/nhl/teams/' + team + '/ical.ics', true);
 	req.onload = function(e) {
 		if (req.readyState == 4 && req.status == 200) {
-			if (req.status == 200) {
-				callback(req.responseText);
-			} else { 
-				console.log('Error getting ical'); 
-			}
-		}
+      callback(req.responseText);
+		} else {
+      Pebble.sendAppMessage({"99": req.status });
+    }
 	};
 	req.send(null);
 }
